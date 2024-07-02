@@ -23,11 +23,11 @@ function debugLog(...args) {
 
 function initializeDebugMode() {
     fetch('/debug_status')
-    .then(response => response.json())
-    .then(data => {
-        setDebugMode(data.debug_mode);
-    })
-    .catch(error => console.error('Error fetching debug status:', error));
+        .then(response => response.json())
+        .then(data => {
+            setDebugMode(data.debug_mode);
+        })
+        .catch(error => console.error('Error fetching debug status:', error));
 }
 
 // Notification handling
@@ -63,13 +63,16 @@ function updateUIForAdminStatus(isAdmin) {
     debugLog('Updating UI for admin status:', isAdmin);
     const header = document.querySelector('.header-container');
     const playNextButtons = document.querySelectorAll('.play-next-button');
+    const iconContainer = document.querySelector('.icon-container');
     
     if (isAdmin) {
         header.classList.add('admin-mode');
         playNextButtons.forEach(button => button.style.display = 'inline-block');
+        iconContainer.classList.add('admin-active');
     } else {
         header.classList.remove('admin-mode');
         playNextButtons.forEach(button => button.style.display = 'none');
+        iconContainer.classList.remove('admin-active');
     }
 }
 
@@ -80,28 +83,21 @@ let radioQueue = [];
 function addTrackToQueue(track_uri, trackName, artistName) {
     debugLog(`Attempting to add track to queue: ${trackName} by ${artistName}`);
 
-    // First, check admin status
-    fetch('/check_admin_status')
-    .then(response => response.json())
-    .then(data => {
-        debugLog('Admin check response:', data);
-        updateUIForAdminStatus(data.is_admin);
-        
-        // Now proceed with adding the track to the queue
-        return fetch('/queue', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ 
-                'track_uri': track_uri, 
-                'track_name': trackName, 
-                'artist_name': artistName,
-                'is_admin': data.is_admin
-            })
-        });
+    const isAdmin = document.querySelector('.header-container').classList.contains('admin-mode');
+    
+    fetch('/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ 
+            'track_uri': track_uri, 
+            'track_name': trackName, 
+            'artist_name': artistName,
+            'is_admin': isAdmin
+        })
     })
     .then(response => response.json())
     .then(data => {
-        debugLog('Server response:', data.status);
+        debugLog('Server response:', data);
         if (data.status === 'success') {
             showNotification(data.message, 'success');
             fetchQueue();
@@ -141,17 +137,17 @@ function playTrackNext(track_uri) {
 function fetchQueue() {
     debugLog('Fetching current queue');
     fetch('/current_queue')
-    .then(response => response.json())
-    .then(data => {
-        debugLog('Current track:', data.current_track ? `${data.current_track.name} by ${data.current_track.artists}` : 'None');
-        debugLog('User queue:', data.user_queue.map(t => `${t.name} by ${t.artists}`).join(', '));
-        debugLog('Radio queue (first 5):', data.radio_queue.slice(0, 5).map(t => `${t.name} by ${t.artists}`).join(', '));
-        
-        userQueue = data.user_queue;
-        radioQueue = data.radio_queue;
-        updateQueueDisplay(data.current_track);
-    })
-    .catch(error => console.error('Error fetching queue:', error));
+        .then(response => response.json())
+        .then(data => {
+            debugLog('Current track:', data.current_track ? `${data.current_track.name} by ${data.current_track.artists}` : 'None');
+            debugLog('User queue:', data.user_queue.map(t => `${t.name} by ${t.artists}`).join(', '));
+            debugLog('Radio queue (first 5):', data.radio_queue.slice(0, 5).map(t => `${t.name} by ${t.artists}`).join(', '));
+            
+            userQueue = data.user_queue;
+            radioQueue = data.radio_queue;
+            updateQueueDisplay(data.current_track);
+        })
+        .catch(error => console.error('Error fetching queue:', error));
 }
 
 function updateQueueDisplay(currentTrack) {
@@ -198,46 +194,117 @@ function updateQueueDisplay(currentTrack) {
     }
 }
 
-// Recommendations and search
-function fetchRecommendations(query) {
-    debugLog('Fetching recommendations for query:', query);
-    fetch(`/recommendations?query=${encodeURIComponent(query)}`)
-    .then(response => response.json())
-    .then(data => {
-        debugLog('Recommendations data:', data);
-        const resultsContainer = document.querySelector('.results');
-        resultsContainer.innerHTML = '';
-        data.forEach(track => {
-            resultsContainer.innerHTML += `
-                <div class="result-item">
-                    ${track.album_art ? `<img src="${track.album_art}" alt="${track.name} album art" class="album-art">` : ''}
-                    <div class="track-info">
-                        <p class="track-name" title="${track.name}">${truncateText(track.name, 40)}</p>
-                        <p class="track-artist" title="${track.artists}">${truncateText(track.artists, 40)}</p>
-                    </div>
-                    <div class="button-container">
-                        <button onclick="addTrackToQueue('${track.uri}', '${track.name}', '${track.artists}')">Add to Queue</button>
-                        ${document.querySelector('.header-container').classList.contains('admin-mode') ?
-                            `<button onclick="playTrackNext('${track.uri}')" class="play-next-button">Play Next</button>` : ''}
-                    </div>
-                </div>`;
-        });
+// Search and recommendations
+function performSearch(query) {
+    debugLog('Performing search. Query:', query);
+    fetch('/check_admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ 'query': query })
     })
-    .catch(error => console.error('Error fetching recommendations:', error));
-}
-
-// Admin functions
-function checkAdminStatus() {
-    debugLog('Checking admin status');
-    fetch('/check_admin_status')
     .then(response => response.json())
     .then(data => {
-        debugLog('Admin status:', data);
-        updateUIForAdminStatus(data.is_admin);
+        debugLog('Admin check response:', data);
+        if (data.is_admin) {
+            updateUIForAdminStatus(true);
+            showNotification('Admin mode activated', 'success');
+            document.querySelector('.results').innerHTML = '';
+        } else {
+            fetchRecommendations(query);
+        }
     })
     .catch(error => {
         console.error('Error checking admin status:', error);
+        fetchRecommendations(query);
     });
+}
+
+function fetchRecommendations(query) {
+    debugLog('Fetching recommendations for query:', query);
+    fetch(`/recommendations?query=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            debugLog('Recommendations data:', data);
+            const resultsContainer = document.querySelector('.results');
+            resultsContainer.innerHTML = '';
+            if (data.length === 0) {
+                resultsContainer.innerHTML = '<p>No results found</p>';
+            } else {
+                data.forEach(track => {
+                    const trackElement = document.createElement('div');
+                    trackElement.className = 'result-item';
+                    trackElement.innerHTML = `
+                        ${track.album_art ? `<img src="${track.album_art}" alt="${track.name} album art" class="album-art">` : ''}
+                        <div class="track-info">
+                            <p class="track-name" title="${track.name}">${truncateText(track.name, 40)}</p>
+                            <p class="track-artist" title="${track.artists}">${truncateText(track.artists, 40)}</p>
+                        </div>
+                        <div class="button-container">
+                            <button class="add-to-queue-button">Add to Queue</button>
+                            ${document.querySelector('.header-container').classList.contains('admin-mode') ?
+                                `<button class="play-next-button">Play Next</button>` : ''}
+                        </div>
+                    `;
+
+                    const addToQueueButton = trackElement.querySelector('.add-to-queue-button');
+                    addToQueueButton.addEventListener('click', () => addTrackToQueue(track.uri, track.name, track.artists));
+
+                    const playNextButton = trackElement.querySelector('.play-next-button');
+                    if (playNextButton) {
+                        playNextButton.addEventListener('click', () => playTrackNext(track.uri));
+                    }
+
+                    resultsContainer.appendChild(trackElement);
+                });
+            }
+        })
+        .catch(error => console.error('Error fetching recommendations:', error));
+}
+
+// Admin functions
+
+function checkAdminKeyword(query) {
+    debugLog('Checking for admin keyword');
+    return fetch('/check_admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ 'query': query })
+    })
+    .then(response => response.json())
+    .then(data => {
+        debugLog('Admin check response:', data);
+        updateUIForAdminStatus(data.is_admin);
+        return data.is_admin;
+    })
+    .catch(error => {
+        console.error('Error checking admin keyword:', error);
+        return false;
+    });
+}
+
+function checkAdminStatus() {
+    debugLog('Checking admin status');
+    fetch('/check_admin_status')
+        .then(response => response.json())
+        .then(data => {
+            debugLog('Admin status:', data);
+            updateUIForAdminStatus(data.is_admin);
+        })
+        .catch(error => {
+            console.error('Error checking admin status:', error);
+        });
+}
+
+function checkAndSyncAdminStatus() {
+    fetch('/check_admin_status')
+        .then(response => response.json())
+        .then(data => {
+            debugLog('Admin status check:', data);
+            updateUIForAdminStatus(data.is_admin);
+        })
+        .catch(error => {
+            console.error('Error checking admin status:', error);
+        });
 }
 
 function deactivateAdminMode() {
@@ -246,26 +313,26 @@ function deactivateAdminMode() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
     })
-    .then(response => {
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    })
+    .then(response => response.json())
     .then(data => {
         debugLog('Admin deactivation response:', data);
         if (data.status === 'success') {
             updateUIForAdminStatus(false);
+            showNotification('Admin mode deactivated', 'info');
+        } else if (data.status === 'error' && data.message === 'Not in admin mode') {
+            console.error('Backend reports not in admin mode, but frontend thinks it is. Syncing state.');
+            updateUIForAdminStatus(false);
+            showNotification('Admin mode deactivated', 'info');
         } else {
-            console.error('Deactivation failed:', data.message);
-            showNotification('Failed to deactivate admin mode', 'error');
+            throw new Error(data.message || 'Failed to deactivate admin mode');
         }
     })
     .catch(error => {
         console.error('Error deactivating admin mode:', error);
-        showNotification('Error deactivating admin mode', 'error');
+        showNotification('Error deactivating admin mode: ' + error.message, 'error');
     });
 }
 
-// Event Listeners and Initialization
 // Event Listeners and Initialization
 document.addEventListener('DOMContentLoaded', () => {
     debugLog('DOM fully loaded and parsed');
@@ -283,72 +350,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
     searchInput.addEventListener('input', (e) => {
         const query = e.target.value;
-        if (query.length > 2) {
-            fetchRecommendations(query);
+        if (query.length > 0) {
+            performSearch(query);
         } else {
             document.querySelector('.results').innerHTML = '';
         }
     });
 
+    searchButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        const query = searchInput.value;
+        if (query.length > 0) {
+            performSearch(query);
+        }
+    });
+
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const query = searchInput.value;
+            if (query.length > 0) {
+                performSearch(query);
+            }
+        }
+    });
+
+    searchButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        const query = searchInput.value;
+        if (query.length > 0) {
+            performSearch(query);
+        }
+    });
+
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const query = searchInput.value;
+            if (query.length > 0) {
+                performSearch(query);
+            }
+        }
+    });
+
+    searchButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        const query = searchInput.value;
+        if (query.length > 0) {
+            performSearch(query);
+        }
+    });
+    
+
     iconContainer.addEventListener('click', () => {
         if (document.querySelector('.header-container').classList.contains('admin-mode')) {
             deactivateAdminMode();
-        }
-    });
-
-    searchButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        const query = searchInput.value;
-        performSearch(query);
-    });
-
-    searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const query = searchInput.value;
-            performSearch(query);
-        }
-    });
-    // New search functionality
-    function performSearch(query) {
-        debugLog('Performing search. Query:', query);
-        
-        // First, check for admin status
-        fetch('/check_admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ 'query': query })
-        })
-        .then(response => response.json())
-        .then(data => {
-            debugLog('Admin check response:', data);
-            updateUIForAdminStatus(data.is_admin);
-            
-            // Now proceed with the search
-            if (query.length > 2) {
-                fetchRecommendations(query);
-            }
-        })
-        .catch(error => {
-            console.error('Error checking admin status:', error);
-            // Proceed with search even if admin check fails
-            if (query.length > 2) {
-                fetchRecommendations(query);
-            }
-        });
-    }
-
-    searchButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        const query = searchInput.value;
-        performSearch(query);
-    });
-
-    searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const query = searchInput.value;
-            performSearch(query);
+        } else {
+            checkAndSyncAdminStatus();
         }
     });
 

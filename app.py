@@ -108,19 +108,16 @@ def check_admin():
 
 @app.route('/check_admin_status', methods=['GET'])
 def check_admin_status():
-    is_admin = check_if_admin()
+    is_admin = session.get('admin', False)
     return jsonify({"is_admin": is_admin})
 
 @app.route('/deactivate_admin', methods=['POST'])
 def deactivate_admin():
-    logger.info("Deactivate admin route called")
     if 'admin' in session:
         session.pop('admin', None)
-        logger.info("Admin key removed from session")
         return jsonify({"status": "success", "message": "Admin mode deactivated"})
     else:
-        logger.info("Admin key not found in session")
-        return jsonify({"status": "error", "message": "Not in admin mode"})
+        return jsonify({"status": "error", "message": "Not in admin mode"}), 400
 
 @app.route('/search', methods=['GET', 'POST'])
 def search():
