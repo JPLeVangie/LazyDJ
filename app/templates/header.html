@@ -1,0 +1,21 @@
+<header class="navbar navbar-expand-lg navbar-dark bg-success">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('routes.index') }}">
+            <img src="{{ url_for('static', filename='icons/lazydjicon-512x512.png') }}" alt="Lazy DJ Icon" width="30" height="30" class="d-inline-block align-top">
+            Lazy DJ
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <button id="newSessionButton" class="btn btn-light">New Session</button>
+                </li>
+                <li class="nav-item">
+                    <button id="shareSessionButton" class="btn btn-light ms-2">Share Session</button>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>

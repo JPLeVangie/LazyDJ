@@ -55,3 +55,37 @@ body {
         padding-bottom: max(env(safe-area-inset-bottom), 0px);
     }
 }
+
+
+/* Custom styles */
+body {
+    background-color: #121212;
+    color: #FFFFFF;
+}
+
+.navbar {
+    background-color: #1DB954 !important;
+}
+
+.card {
+    background-color: #282828;
+    color: #FFFFFF;
+}
+
+.list-group-item {
+    background-color: #3E3E3E;
+    color: #FFFFFF;
+    border-color: #121212;
+}
+
+.btn-primary {
+    background-color: #1DB954;
+    border-color: #1DB954;
+}
+
+.btn-primary:hover {
+    background-color: #1ED760;
+    border-color: #1ED760;
+}
+
+/* Add more custom styles as needed */

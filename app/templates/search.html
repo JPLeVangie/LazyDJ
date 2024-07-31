@@ -14,35 +14,61 @@
 <div class="content-container">
     <div class="main-content">
         <div class="search-bar-container">
-            <form class="search-bar" action="{{ url_for('routes.search') }}" method="get">
-                <input type="text" name="query" placeholder="Search for a song..." value="{{ query }}">
-                <button type="submit">Search</button>
-                <button type="button" class="clear-button">Clear</button>
+            <form class="mb-3">
+                <div class="input-group">
+                    <input type="text" class="form-control" name="query" placeholder="Search for a track...">
+                    <button class="btn btn-primary" type="submit">Search</button>
+                    <button class="btn btn-danger" type="button" id="clearButton">Clear</button>
+                </div>
             </form>
         </div>
-        <div class="results">
+        <div class="results row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
             {% for track in tracks %}
-            <div class="result-item">
-                {% if track.album_art %}
-                <img src="{{ track.album_art }}" alt="{{ track.name }} album art" class="album-art">
-                {% endif %}
-                <div class="track-info">
-                    <p class="track-name" title="{{ track.name }}">{{ track.name|truncate(40, true, '...') }}</p>
-                    <p class="track-artist" title="{{ track.artists }}">{{ track.artists|truncate(40, true, '...') }}</p>
-                </div>
-                <div class="button-container">
-                    <button onclick="addTrackToQueue('{{ track.uri }}', '{{ track.name|e }}', '{{ track.artists|e }}')">Add to Queue</button>
-                    {% if admin_mode %}
-                    <button onclick="playTrackNow('{{ track.uri }}')" class="play-now-button">Play Now</button>
+            <div class="col">
+                <div class="card h-100">
+                    {% if track.album_art %}
+                    <img src="{{ track.album_art }}" class="card-img-top" alt="{{ track.name }} album art">
                     {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ track.name|truncate(40, true, '...') }}</h5>
+                        <p class="card-text">{{ track.artists|truncate(40, true, '...') }}</p>
+                        <button class="btn btn-primary btn-sm" onclick="addTrackToQueue('{{ track.uri }}', '{{ track.name }}', '{{ track.artists }}')">Add to Queue</button>
+                        {% if admin_mode %}
+                        <button class="btn btn-secondary btn-sm" onclick="playTrackNow('{{ track.uri }}')">Play Now</button>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
-    <div id="queueContainer" class="queue-container">
-        <h2>Now Playing</h2>
-        <div id="queue" class="queue"></div>
+    <div class="queue-container card">
+        <div class="card-header">
+            <h5 class="mb-0">Queue</h5>
+        </div>
+        <div class="card-body">
+            <h6>Now Playing</h6>
+            <p class="current-track-info">{% if current_track %}{{ current_track.name }} by {{ current_track.artists }}{% else %}No track playing{% endif %}</p>
+            
+            <h6 class="mt-3">Up Next</h6>
+            <ul class="list-group">
+                {% for track in user_queue %}
+                <li class="list-group-item">{{ track.name }} by {{ track.artists }}</li>
+                {% endfor %}
+            </ul>
+            
+            {% if radio_queue %}
+            <h6 class="mt-3">On Deck</h6>
+            <ul class="list-group">
+                {% for track in radio_queue[:5] %}
+                <li class="list-group-item">{{ track.name }} by {{ track.artists }}</li>
+                {% endfor %}
+                {% if radio_queue|length > 5 %}
+                <li class="list-group-item text-muted">+ {{ radio_queue|length - 5 }} more tracks</li>
+                {% endif %}
+            </ul>
+            {% endif %}
+        </div>
     </div>
 </div>
 
